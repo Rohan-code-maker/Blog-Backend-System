@@ -1,5 +1,5 @@
 {
-  "name": "e-commerce",
+  "name": "youtube",
   "version": "1.0.0",
   "description": "",
   "type": "module",
@@ -10,10 +10,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "cookie-parser": "^1.4.7",
-    "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
+    "mongodb": "^6.10.0",
     "mongoose": "^8.7.2"
   },
   "devDependencies": {
