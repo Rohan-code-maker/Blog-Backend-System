@@ -50,7 +50,7 @@ const userSchema = new Schema({
 //pre hook is used just before the database manipulation
 userSchema.pre("save", async function (next) { //next is used if there is any middleware
     if(!this.isModified("password")) return next();
-    this.password = bcrypt.hash(this.password, 10)
+    this.password = await bcrypt.hash(this.password, 10)
     next()
 })
 
