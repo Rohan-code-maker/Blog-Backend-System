@@ -36,8 +36,15 @@ const deleteFromCloudinary = async (oldImage) => {
     try {
         if (!oldImage) return null;
 
+        let resourceType = "image"; // Default to image
+        if (fileUrl.match(/\.(mp4|mkv|mov|avi)$/)) {
+            resourceType = "video";
+        } else if (fileUrl.match(/\.(mp3|wav)$/)) {
+            resourceType = "raw"; // For audio or other file types
+        }
+
         const response = await cloudinary.uploader.destroy(getPublicIdFromUrl(oldImage), {
-            resource_type: "image"
+            resource_type: resourceType
         });        
 
         // Check if the deletion was successful
