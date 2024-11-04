@@ -6,7 +6,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 
 const toggleVideoLike = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
-  if (!videoId) {
+  if (!isValidObjectId(videoId)) {
     throw new ApiError(400, "Video id is required");
   }
   //TODO: toggle like on video
@@ -45,7 +45,7 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
 
 const toggleCommentLike = asyncHandler(async (req, res) => {
   const { commentId } = req.params;
-  if(!commentId){
+  if(!isValidObjectId(commentId)){
     throw new ApiError(400,"Comment Id is required")
   }
   //TODO: toggle like on comment
@@ -87,7 +87,7 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
 
 const toggleTweetLike = asyncHandler(async (req, res) => {
   const { tweetId } = req.params;
-  if(!tweetId){
+  if(!isValidObjectId(tweetId)){
     throw new ApiError(401,"Tweet id is required")
   }
   //TODO: toggle like on tweet
