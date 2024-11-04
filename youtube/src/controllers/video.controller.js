@@ -69,6 +69,12 @@ const publishAVideo = asyncHandler(async (req, res) => {
   if (!title || !description) {
     throw new ApiError(404, "Please fill the Title and Description");
   }
+
+  const userID = req.user?._id
+  if(!userID){
+    throw new ApiError(401, "Unauthorized User")
+  }
+
   const videoLocalPath = req?.files?.videoFile[0]?.path;
   const thumbnailLocalPath = req?.files?.thumbnail[0]?.path;
 
@@ -89,17 +95,19 @@ const publishAVideo = asyncHandler(async (req, res) => {
     title,
     description,
     duration: video.duration,
-    owner: req.user?._id,
+    owner: userID,
   });
 
-  return res.status(200).json(200, { savedVideo }, "Video uploaded");
+  return res
+  .status(200)
+  .json(200, { savedVideo }, "Video uploaded");
 });
 
 const getVideoById = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
   //TODO: get video by id
-  if (!videoId) {
-    throw new ApiError(404, "Video id is required");
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(404, "Video id is not valid");
   }
 
   const video = await Video.findById(videoId);
@@ -119,8 +127,8 @@ const updateVideo = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Please fill the Title and Description");
   }
 
-  if (!videoId) {
-    throw new ApiError(400, "Video id is required");
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, "Video id is not valid");
   }
 
   const oldVideo = await Video.findById(videoId);
@@ -176,8 +184,8 @@ const updateVideo = asyncHandler(async (req, res) => {
 const deleteVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
   //TODO: delete video
-  if (!videoId) {
-    throw new ApiError(400, "Video id is required");
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, "Video id is not valid");
   }
 
   const oldVideo = await Video.findById(videoId);
@@ -204,8 +212,8 @@ const deleteVideo = asyncHandler(async (req, res) => {
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
-  if (!videoId) {
-    throw new ApiError(400, "Video id is required");
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, "Video id is not valid");
   }
 
   const video = await Video.findById(videoId);
