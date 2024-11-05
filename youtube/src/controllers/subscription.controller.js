@@ -10,11 +10,15 @@ const toggleSubscription = asyncHandler(async (req, res) => {
     // TODO: toggle subscription
     if(!isValidObjectId(channelId)){
         throw new ApiError(400, "Invalid channel ID")
-    }
+    }    
     
     const userId = req.user?._id
     if(!userId){
         throw new ApiError(400, "User not authenticated")
+    }    
+
+    if (userId.equals(channelId)) {
+        throw new ApiError(400, "Cannot subscribe to your own channel");
     }
 
     try {
@@ -102,7 +106,7 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
         },
         {
             $project: {
-                $subscriberCount:1
+                subscriberCount:1
             }
         }
     ])
@@ -136,6 +140,15 @@ const getSubscribedChannels = asyncHandler(async (req, res) => {
                 localField:"channel",
                 foreignField:"_id",
                 as: "channels",
+                pipeline:[
+                    {
+                        $project:{
+                            username:1,
+                            fullname:1,
+                            avatar: 1,
+                        }
+                    }
+                ]
             }
         },
         {
