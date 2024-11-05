@@ -8,73 +8,69 @@ import {asyncHandler} from "../utils/asyncHandler.js"
 
 const getChannelStats = asyncHandler(async (req, res) => {
     // TODO: Get the channel stats like total video views, total subscribers, total videos, total likes etc.
-    const userId = new mongoose.Types.ObjectId(req.user?._id)
-    if(!userId)
-    {
-        throw new ApiError(401, "User not authenticated")
+    const userId = new mongoose.Types.ObjectId(req.user?._id);
+    if (!userId) {
+        throw new ApiError(401, "User not authenticated");
     }
 
-    const videoCount = await Video.aggregate([
+    // Total views and videos count
+    const videoCountResult = await Video.aggregate([
         {
-            $match:{
-                owner:userId
+            $match: {
+                owner: userId
             }
         },
         {
-            $group:{
-                _id:"$views",
-                totalViews:{
-                    $sum:"$views"
+            $group: {
+                _id: null,
+                totalViews: {
+                    $sum: "$views"
                 },
-                totalVideos:{
-                    $sum:1
+                totalVideos: {
+                    $sum: 1
                 }
             }
         },
         {
-            $project:{
-                _id:0,
-                totalViews:1,
-                totalVideos:1
+            $project: {
+                _id: 0,
+                totalViews: { $ifNull: ["$totalViews", 0] },
+                totalVideos: { $ifNull: ["$totalVideos", 0] }
             }
         }
-    ])
+    ]);
 
-    if(!videoCount)
-    {
-        throw new ApiError(500, "Failed to fetch video count")
-    }
+    const videoCount = videoCountResult[0] || { totalViews: 0, totalVideos: 0 };
 
-    const subscriberCount = await Subscription.aggregate([
+    // Total subscribers count
+    const subscriberCountResult = await Subscription.aggregate([
         {
-            $match:{
-                channel:userId
+            $match: {
+                channel: userId
             }
         },
         {
-            $group:{
-                _id:null,
-                totalSubscribers:{
-                    $sum:1
+            $group: {
+                _id: null,
+                totalSubscribers: {
+                    $sum: 1
                 }
             }
         },
         {
-            $project:{
-                _id:0,
-                totalSubscribers:1
+            $project: {
+                _id: 0,
+                totalSubscribers: { $ifNull: ["$totalSubscribers", 0] }
             }
         }
-    ])
+    ]);
 
-    if(!subscriberCount)
-    {
-        throw new ApiError(500, "Failed to fetch subscriber count")
-    }
+    const subscriberCount = subscriberCountResult[0] || { totalSubscribers: 0 };
 
-    const likeCount = await Like.aggregate([
+    // Total likes count
+    const likeCountResult = await Like.aggregate([
         {
-            $lookup:{
+            $lookup: {
                 from: "videos",
                 localField: "video",
                 foreignField: "_id",
@@ -82,15 +78,15 @@ const getChannelStats = asyncHandler(async (req, res) => {
             }
         },
         {
-            $lookup:{
-                from:"tweets",
+            $lookup: {
+                from: "tweets",
                 localField: "tweet",
                 foreignField: "_id",
                 as: "tweetInfo"
             }
         },
         {
-            $lookup:{
+            $lookup: {
                 from: "comments",
                 localField: "comment",
                 foreignField: "_id",
@@ -98,46 +94,45 @@ const getChannelStats = asyncHandler(async (req, res) => {
             }
         },
         {
-            $match:{
-                $or:[
-                    {"videoInfo.owner":userId},
-                    {"tweetInfo.owner":userId},
-                    {"commentInfo.owner":userId},
+            $match: {
+                $or: [
+                    { "videoInfo.owner": userId },
+                    { "tweetInfo.owner": userId },
+                    { "commentInfo.owner": userId }
                 ]
             }
         },
         {
-            $group:{
-                _id:null,
-                totalLikes:{
-                    $sum:1
+            $group: {
+                _id: null,
+                totalLikes: {
+                    $sum: 1
                 }
             }
         },
         {
-            $project:{
-                _id:0,
-                totalLikes:1
+            $project: {
+                _id: 0,
+                totalLikes: { $ifNull: ["$totalLikes", 0] }
             }
         }
-    ])
+    ]);
 
-    if(!likeCount){
-        throw new ApiError(500, "Failed to fetch likes count")
-    }
+    const likeCount = likeCountResult[0] || { totalLikes: 0 };
 
+    // Prepare the response data
     const info = {
-        views:videoCount[0].totalViews,
-        videos:videoCount[0].totalVideos,
-        subscribers:subscriberCount[0].totalSubscribers,
-        likes:likeCount[0].totalLikes
-    }
+        views: videoCount.totalViews,
+        videos: videoCount.totalVideos,
+        subscribers: subscriberCount.totalSubscribers,
+        likes: likeCount.totalLikes
+    };
 
     return res
-    .status(200)
-    .json(new ApiResponse(200, info, "Channel stats fetched successfully"))
+        .status(200)
+        .json(new ApiResponse(200, info, "Channel stats fetched successfully"));
+});
 
-})
 
 const getChannelVideos = asyncHandler(async (req, res) => {
     // TODO: Get all the videos uploaded by the channel
