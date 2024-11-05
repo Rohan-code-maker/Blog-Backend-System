@@ -36,10 +36,6 @@ const getUserTweets = asyncHandler(async (req, res) => {
     if (!userId) {
         throw new ApiError(400, "User not authenticated")
     }
-    const {tweetId} = req.params
-    if(!isValidObjectId(tweetId)){
-        throw new ApiError(400, "Invalid tweet ID")
-    }
 
     const userTweets = await Tweet.find({ owner: userId }).populate("content")
     if(!userTweets){
@@ -81,7 +77,7 @@ const updateTweet = asyncHandler(async (req, res) => {
         {new: true}
     )
     if(!updatedTweet){
-        throw new ApiError(404, "Tweet not found")
+        throw new ApiError(500, "Tweet is not updated")
     }
 
     return res
@@ -96,7 +92,11 @@ const deleteTweet = asyncHandler(async (req, res) => {
         throw new ApiError(403, "Tweet ID is not valid")
     }
     const tweet = await Tweet.findById(tweetId)
-    if(!(tweet?.owner).equals(req,user?._id)){
+    if(!tweet){
+        throw new ApiError(404, "Tweet not found")
+    }
+    
+    if(!(tweet?.owner).equals(req.user?._id)){
         throw new ApiError(403, "You cannot delete the tweet")
     }
     const deletedTweet = await Tweet.findByIdAndDelete(tweet?._id)
@@ -106,7 +106,7 @@ const deleteTweet = asyncHandler(async (req, res) => {
 
     return res
     .status(200)
-    .json(new ApiResponse(200, deletedTweet, "Tweet deleted successfully"))
+    .json(new ApiResponse(200, {}, "Tweet deleted successfully"))
 })
 
 export {
