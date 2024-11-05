@@ -100,7 +100,7 @@ const publishAVideo = asyncHandler(async (req, res) => {
 
   return res
   .status(200)
-  .json(200, { savedVideo }, "Video uploaded");
+  .json(new ApiResponse(200, { savedVideo }, "Video uploaded"));
 });
 
 const getVideoById = asyncHandler(async (req, res) => {
@@ -116,7 +116,7 @@ const getVideoById = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Video File is not found");
   }
 
-  return res.status(200).json(200, { video }, "Video fetched Successfully");
+  return res.status(200).json(new ApiResponse(200, { video }, "Video fetched Successfully"));
 });
 
 const updateVideo = asyncHandler(async (req, res) => {
@@ -136,18 +136,12 @@ const updateVideo = asyncHandler(async (req, res) => {
     throw new ApiError(404, "You Cannot Update the Video");
   }
 
-  const deleteOldVideo = await deleteFromCloudinary(oldVideo?.videoFile);
-  const deleteOldThumbnail = await deleteFromCloudinary(oldVideo?.thumbnail);
+  const oldVideoFile = oldVideo?.videoFile
+  const oldThumbnail = oldVideo?.thumbnail;  
 
-  if (deleteOldVideo.result !== "ok" || deleteOldThumbnail.result !== "ok") {
-    throw new ApiError(
-      404,
-      "Failed to delete old video and thumbnail from cloudinary"
-    );
-  }
+  const newVideo = req.files?.videoFile?.[0]?.path;  
+  const newThumbnail = req.files?.thumbnail?.[0]?.path;  
 
-  const newVideo = req?.files?.videoFile[0]?.path;
-  const newThumbnail = req?.files?.thumbnail[0]?.path;
   if (!newVideo || !newThumbnail) {
     throw new ApiError(404, "Please upload new Video and Thumbnail");
   }
@@ -176,9 +170,19 @@ const updateVideo = asyncHandler(async (req, res) => {
     }
   );
 
+  const deleteOldVideo = await deleteFromCloudinary(oldVideoFile);
+  const deleteOldThumbnail = await deleteFromCloudinary(oldThumbnail);
+
+  if (deleteOldVideo.result !== "ok" || deleteOldThumbnail.result !== "ok") {
+    throw new ApiError(
+      404,
+      "Failed to delete old video and thumbnail from cloudinary"
+    );
+  }
+
   return res
     .status(200)
-    .json(200, { updatedVideo }, "Video details Updated successfully");
+    .json(new ApiResponse(200, { updatedVideo }, "Video details Updated successfully"));
 });
 
 const deleteVideo = asyncHandler(async (req, res) => {
@@ -193,8 +197,16 @@ const deleteVideo = asyncHandler(async (req, res) => {
     throw new ApiError(404, "You Cannot Delete the Video");
   }
 
-  const deleteOldVideo = await deleteFromCloudinary(oldVideo?.videoFile);
-  const deleteOldThumbnail = await deleteFromCloudinary(oldVideo?.thumbnail);
+  const oldVideoFile = oldVideo?.videoFile
+  const oldThumbnail = oldVideo?.thumbnail;
+
+  const deletedVideo = await Video.findByIdAndDelete(videoId);
+  if (!deletedVideo) {
+    throw new ApiError(404, "Video File is not found");
+  }
+
+  const deleteOldVideo = await deleteFromCloudinary(oldVideoFile);
+  const deleteOldThumbnail = await deleteFromCloudinary(oldThumbnail);
 
   if (deleteOldVideo.result !== "ok" || deleteOldThumbnail.result !== "ok") {
     throw new ApiError(
@@ -203,11 +215,7 @@ const deleteVideo = asyncHandler(async (req, res) => {
     );
   }
 
-  const deletedVideo = await Video.findByIdAndDelete(videoId);
-  if (!deletedVideo) {
-    throw new ApiError(404, "Video File is not found");
-  }
-  return res.status(200).json(200, {}, "Video Deleted Successfully");
+  return res.status(200).json(new ApiResponse(200, {}, "Video Deleted Successfully"));
 });
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
@@ -235,7 +243,7 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
 
   return res
   .status(200)
-  .json(200,{toggleStatus},"Video publish status is toggled successfully")
+  .json(new ApiResponse(200,{toggleStatus},"Video publish status is toggled successfully"))
 
 });
 

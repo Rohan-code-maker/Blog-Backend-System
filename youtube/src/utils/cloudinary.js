@@ -1,4 +1,5 @@
 import {v2 as cloudinary} from "cloudinary"
+import {extractPublicId} from "cloudinary-build-url"
 import fs from "fs" //fileSystem
 
 
@@ -9,11 +10,6 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-function getPublicIdFromUrl(url) {
-    // Match the pattern to extract the public ID (ignoring the beginning part and the extension)
-    const matches = url.match(/\/([^/]+)\.[a-z]+$/i);
-    return matches ? matches[1] : null;
-}
 
 const uploadOnCloudinary = async (localFilePath) => {
     try {
@@ -23,7 +19,6 @@ const uploadOnCloudinary = async (localFilePath) => {
             resource_type: "auto"
         })
         //file has been uploaded successfully
-        // console.log("file is uploaded successfully ",response.url);
         fs.unlinkSync(localFilePath)
         return response
     } catch (error) {
@@ -32,20 +27,23 @@ const uploadOnCloudinary = async (localFilePath) => {
     }
 }
 
-const deleteFromCloudinary = async (oldImage) => {
+const deleteFromCloudinary = async (oldFile) => {    
     try {
-        if (!oldImage) return null;
+        if (!oldFile) return null;
+
+        const publicId = extractPublicId(oldFile)
 
         let resourceType = "image"; // Default to image
-        if (fileUrl.match(/\.(mp4|mkv|mov|avi)$/)) {
+        if (oldFile.match(/\.(mp4|mkv|mov|avi)$/)) {
             resourceType = "video";
-        } else if (fileUrl.match(/\.(mp3|wav)$/)) {
+        } else if (oldFile.match(/\.(mp3|wav)$/)) {
             resourceType = "raw"; // For audio or other file types
         }
 
-        const response = await cloudinary.uploader.destroy(getPublicIdFromUrl(oldImage), {
+        const response = await cloudinary.uploader.destroy(publicId, {
             resource_type: resourceType
-        });        
+        });
+           
 
         // Check if the deletion was successful
         if (response.result === "ok") {

@@ -230,15 +230,22 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 });
 
 const changeCurrentPassword = asyncHandler(async (req, res) => {
-  const { oldPassword, newPasword } = req.body;
+  const { oldPassword, newPassword } = req.body;
+  if(!oldPassword) {
+    throw new ApiError(400, "Old password is required");
+  }
+  if(!newPassword) {
+    throw new ApiError(400, "New password is required");  
+  }
+
   const user = await User.findById(req.user?._id);
-  const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
+  const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);  
 
   if (!isPasswordCorrect) {
     throw new ApiError(401, "Incorrect old password");
   }
 
-  user.password = newPasword;
+  user.password = newPassword;
   await user.save({ validateBeforeSave: false });
 
   return res
@@ -253,10 +260,10 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 });
 
 const updateAccountDetails = asyncHandler(async (req, res) => {
-  const { fullname, email } = req.body;
+  const { fullname, email, username} = req.body;
 
-  if (!fullname || !email) {
-    throw new ApiError(400, "Fullname and Email are required");
+  if (!fullname || !email || !username) {
+    throw new ApiError(400, "Fullname, Email, Username are required");
   }
 
   const user = await User.findByIdAndUpdate(
@@ -264,7 +271,8 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
     {
       $set: {
         fullname,
-        email: email,
+        email,
+        username: username.toLowerCase(),
       },
     },
     { new: true }
@@ -286,10 +294,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
   // Fetch the old avatar URL from the database
   const oldAvatar = await User.findById(userId).select("avatar");
 
-  if (oldAvatar && oldAvatar.avatar) {
-    // Delete old avatar from Cloudinary if it exists
-    await deleteFromCloudinary(oldAvatar.avatar);
-  }
+  const oldAvatarURL = oldAvatar?.avatar
 
   // Get the path of the uploaded avatar file
   const avatarLocalPath = req.file?.path;
@@ -314,6 +319,15 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     { new: true }
   ).select("-password -refreshToken");
 
+  // Delete old avatar from Cloudinary if it exists
+  const oldAvatarFromCloudinary = await deleteFromCloudinary(oldAvatarURL)
+  if (oldAvatarFromCloudinary.result !== "ok") {
+    throw new ApiError(
+      404,
+      "Failed to delete old avatar from Cloudinary"
+    );
+  }
+
   // Send success response
   return res
     .status(200)
@@ -331,10 +345,7 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
   // Fetch the old avatar URL from the database
   const oldCoverImage = await User.findById(userId).select("coverImage");
 
-  if (oldCoverImage && oldCoverImage.coverImage) {
-    // Delete old avatar from Cloudinary if it exists
-    await deleteFromCloudinary(oldCoverImage.coverImage);
-  }
+  const oldCoverImageUrl = oldCoverImage?.coverImage
 
   // Get the path of the uploaded avatar file
   const coverImageLocalPath = req.file?.path;
@@ -358,6 +369,14 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     },
     { new: true }
   ).select("-password -refreshToken");
+
+  const deleteOldThumbnail = await deleteOnCloudinary(oldCoverImageUrl)
+  if (deleteOldThumbnail.result !== "ok") {
+    throw new ApiError(
+      404,
+      "Failed to delete old cover image from cloudinary"
+    );
+  }
 
   // Send success response
   return res
@@ -443,7 +462,7 @@ const getWatchHistory = asyncHandler(async (req,res) => {
   const user = await User.aggregate([
     {
       $match:{
-        _id: new mongoose.Types.ObjectId(req.user._id)
+        _id: new mongoose.Types.ObjectId(req.user?._id)
       }
     },
     {
