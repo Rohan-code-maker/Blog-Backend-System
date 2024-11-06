@@ -19,7 +19,6 @@ const createPlaylist = asyncHandler(async (req, res) => {
   const playlist = await Playlist.create({
     name,
     description,
-    videos: [],
     owner: userId,
   });
 
@@ -33,10 +32,10 @@ const createPlaylist = asyncHandler(async (req, res) => {
 });
 
 const getUserPlaylists = asyncHandler(async (req, res) => {
-  const { userId } = req.params;
+  const userId = req.user?._id;
   //TODO: get user playlists
-  if (!isValidObjectId(userId)) {
-    throw new ApiError(400, "Invalid user ID");
+  if (!userId) {
+    throw new ApiError(400, "User not authenticated");
   }
 
   const userPlaylists = await Playlist.find({ owner: userId });
@@ -147,14 +146,13 @@ const updatePlaylist = asyncHandler(async (req, res) => {
     { new: true }
   );
 
-  if(!updatedPlaylist){
+  if (!updatedPlaylist) {
     throw new ApiError(404, "Playlist not found");
   }
 
   return res
-   .status(200)
-   .json(new ApiResponse(200, updatedPlaylist, "Playlist updated"));
-
+    .status(200)
+    .json(new ApiResponse(200, updatedPlaylist, "Playlist updated"));
 });
 
 export {
