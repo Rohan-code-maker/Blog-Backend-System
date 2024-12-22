@@ -64,10 +64,10 @@ const registerUser = asyncHandler(async (req, res) => {
 
   //upload them to cloudinary, avatar
   const avatar = await uploadOnCloudinary(avatarLocalPath);
-  const coverImage = await uploadOnCloudinary(coverImageLocalPath);
+  const coverImage = await uploadOnCloudinary(coverImageLocalPath);  
 
   if (!avatar) {
-    throw new ApiError(400, "Avatar file is required");
+    throw new ApiError(400, "Avatar file is not uploaded");
   }
 
   //create user object - create entry in db
@@ -92,7 +92,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
   //return response
   return res
-    .status(201)
+    .status(200)
     .json(new ApiResponse(200, createdUser, "User registred successfully"));
 });
 

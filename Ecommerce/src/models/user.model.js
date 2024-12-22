@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 
 const userSchema = new mongoose.Schema(
   {
@@ -9,26 +10,75 @@ const userSchema = new mongoose.Schema(
       required: true,
       unique: true,
       lowercase: true,
+      trim: true,
+      index: true,
     },
     email: {
       type: String,
       required: true,
       unique: true,
       lowercase: true,
+      trim: true,
+      index: true,
     },
     password: {
       type: String,
-      required: [true,"Password is Required"],
-    },
-    isAdmin: {
-      type: Boolean,
-      default: false,
       required: true,
     },
-    refreshToken:{
+    firstname: {
+      type: String,
+      required: true,
+    },
+    lastname: {
+      type: String,
+      required: true,
+    },
+    gender: {
+      type: String,
+      enum: ["male", "female", "other"],
+    },
+    phone: {
+      type: Number,
+      required: true,
+    },
+    dob: {
+      type: Date,
+    },
+    role: {
+      type: String,
+      enum: ["admin", "user"],
+      default: "user",
+    },
+    refreshToken: {
       type: String,
       default: null,
-    }
+    },
+    googleId: {
+      type: String,
+    },
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    phoneVerified: {
+      type: Boolean,
+      default: false,
+    },
+    phoneVerificationCode: {
+      type: Number,
+    },
+    emailVerificationToken: {
+      type: String,
+    },
+    emailVerificationTokenExpires: {
+      type: Date,
+    },
+    usedCoupons: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Coupon",
+      },
+    ],
   },
   { timestamps: true }
 );
@@ -52,9 +102,12 @@ userSchema.methods.generateAccessToken = function () {
   return jwt.sign(
     {
       _id: this._id,
+      email: this.email,
+      username: this.username,
+      role: this.role,
     },
     process.env.ACCESS_TOKEN_SECRET,
-    { expiresIn: ACCESS_TOKEN_EXPIRY }
+    { expiresIn: process.env.ACCESS_TOKEN_EXPIRY }
   );
 };
 
@@ -64,8 +117,21 @@ userSchema.methods.generateRefreshToken = function () {
       _id: this._id,
     },
     process.env.REFRESH_TOKEN_SECRET,
-    { expiresIn: REFRESH_TOKEN_EXPIRY }
+    { expiresIn: process.env.REFRESH_TOKEN_EXPIRY }
   );
 };
+
+userSchema.methods.generateVerificationToken = function () {
+  const verificationToken = crypto.randomBytes(32).toString("hex")
+
+  this.emailVerificationToken = crypto
+  .hash("sha256")
+  .update(verificationToken)
+  .digest("hex");
+
+  this.emailVerificationTokenExpires = Date.now() + 24 * 60 * 60 * 1000; // token valid for 24 hrs
+
+  return this.emailVerificationToken
+}
 
 export const User = mongoose.model("User", userSchema);

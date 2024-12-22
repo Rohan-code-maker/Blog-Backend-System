@@ -1,10 +1,14 @@
 import mongoose from "mongoose";
 
 const categorySchema = new mongoose.Schema({
-    name:{
+    categoryName:{
         type:String,
         required: true,
-        unique: true
+        unique: true,
+    },
+    description:{
+        type: String,
+        required: true
     }
 },{timestamps:true})
 
