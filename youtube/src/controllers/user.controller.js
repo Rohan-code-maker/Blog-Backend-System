@@ -64,7 +64,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
   //upload them to cloudinary, avatar
   const avatar = await uploadOnCloudinary(avatarLocalPath);
-  const coverImage = await uploadOnCloudinary(coverImageLocalPath);  
+  const coverImage = await uploadOnCloudinary(coverImageLocalPath);
 
   if (!avatar) {
     throw new ApiError(400, "Avatar file is not uploaded");
@@ -79,6 +79,11 @@ const registerUser = asyncHandler(async (req, res) => {
     avatar: avatar.url,
     coverImage: coverImage?.url || "",
   });
+
+  // Generate and save the refresh token
+  const refreshToken = user.generateRefreshToken();
+  user.refreshToken = refreshToken;
+  await user.save();
 
   //remove password and refresh token field from response
   const createdUser = await User.findById(user._id).select(
@@ -229,17 +234,37 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   }
 });
 
+const forgotPassword = asyncHandler(async(req,res) => {
+  const {email, username, newPassword} = req.body;
+  if (
+    [email, username, newPassword].some((field) => field?.trim() === "")
+  ) {
+    throw new ApiError(400, "All fields are required");
+  }
+
+  const user = await User.findOne({email: email, username: username});
+  if(!user) {
+    throw new ApiError(404, "User not found");
+  }
+  user.password = newPassword;
+  await user.save({ validateBeforeSave: false });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Password Changed Successfully"));
+})
+
 const changeCurrentPassword = asyncHandler(async (req, res) => {
   const { oldPassword, newPassword } = req.body;
-  if(!oldPassword) {
+  if (!oldPassword) {
     throw new ApiError(400, "Old password is required");
   }
-  if(!newPassword) {
-    throw new ApiError(400, "New password is required");  
+  if (!newPassword) {
+    throw new ApiError(400, "New password is required");
   }
 
   const user = await User.findById(req.user?._id);
-  const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);  
+  const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
 
   if (!isPasswordCorrect) {
     throw new ApiError(401, "Incorrect old password");
@@ -260,7 +285,7 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 });
 
 const updateAccountDetails = asyncHandler(async (req, res) => {
-  const { fullname, email, username} = req.body;
+  const { fullname, email, username } = req.body;
 
   if (!fullname || !email || !username) {
     throw new ApiError(400, "Fullname, Email, Username are required");
@@ -294,7 +319,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
   // Fetch the old avatar URL from the database
   const oldAvatar = await User.findById(userId).select("avatar");
 
-  const oldAvatarURL = oldAvatar?.avatar
+  const oldAvatarURL = oldAvatar?.avatar;
 
   // Get the path of the uploaded avatar file
   const avatarLocalPath = req.file?.path;
@@ -320,12 +345,9 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
   ).select("-password -refreshToken");
 
   // Delete old avatar from Cloudinary if it exists
-  const oldAvatarFromCloudinary = await deleteFromCloudinary(oldAvatarURL)
+  const oldAvatarFromCloudinary = await deleteFromCloudinary(oldAvatarURL);
   if (oldAvatarFromCloudinary.result !== "ok") {
-    throw new ApiError(
-      404,
-      "Failed to delete old avatar from Cloudinary"
-    );
+    throw new ApiError(404, "Failed to delete old avatar from Cloudinary");
   }
 
   // Send success response
@@ -345,7 +367,7 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
   // Fetch the old avatar URL from the database
   const oldCoverImage = await User.findById(userId).select("coverImage");
 
-  const oldCoverImageUrl = oldCoverImage?.coverImage
+  const oldCoverImageUrl = oldCoverImage?.coverImage;
 
   // Get the path of the uploaded avatar file
   const coverImageLocalPath = req.file?.path;
@@ -370,12 +392,9 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     { new: true }
   ).select("-password -refreshToken");
 
-  const deleteOldThumbnail = await deleteOnCloudinary(oldCoverImageUrl)
+  const deleteOldThumbnail = await deleteOnCloudinary(oldCoverImageUrl);
   if (deleteOldThumbnail.result !== "ok") {
-    throw new ApiError(
-      404,
-      "Failed to delete old cover image from cloudinary"
-    );
+    throw new ApiError(404, "Failed to delete old cover image from cloudinary");
   }
 
   // Send success response
@@ -406,37 +425,37 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
     },
 
     {
-      $lookup:{
+      $lookup: {
         from: "subscriptions",
         localField: "_id",
         foreignField: "subscriber",
         as: "subscribedTo",
-      }
+      },
     },
 
     {
-      $addFields:{
-        subscribersCount:{
-          $size: "$subscribers"
+      $addFields: {
+        subscribersCount: {
+          $size: "$subscribers",
         },
-        channelsSubscribedToCount:{
-          $size:"$subscribedTo"
+        channelsSubscribedToCount: {
+          $size: "$subscribedTo",
         },
-        isSubscribed:{
-          $cond:{
-            if:{$in: [req.user?._id,"$subscribers.subscriber"]},
+        isSubscribed: {
+          $cond: {
+            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
             then: true,
-            else: false
-          }
-        }
-      }
+            else: false,
+          },
+        },
+      },
     },
 
     {
       $project: {
         username: 1,
         fullname: 1,
-        email:1,
+        email: 1,
         avatar: 1,
         coverImage: 1,
         subscribersCount: 1,
@@ -444,77 +463,81 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
         isSubscribed: 1,
       },
     },
-
   ]);
 
   if (!channel?.length) {
     throw new ApiError(404, "User not found");
   }
 
-  return res.status(200)
-  .json(
-    new ApiResponse(200, channel[0], "User channel fetched successfully")
-  );
-
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, channel[0], "User channel fetched successfully")
+    );
 });
 
-const getWatchHistory = asyncHandler(async (req,res) => {
+const getWatchHistory = asyncHandler(async (req, res) => {
   const user = await User.aggregate([
     {
-      $match:{
-        _id: new mongoose.Types.ObjectId(req.user?._id)
-      }
+      $match: {
+        _id: new mongoose.Types.ObjectId(req.user?._id),
+      },
     },
     {
-      $lookup:{
+      $lookup: {
         from: "videos",
         localField: "watchHistory",
         foreignField: "_id",
         as: "watchHistory",
-        pipeline:[
+        pipeline: [
           {
-            $lookup:{
+            $lookup: {
               from: "users",
               localField: "owner",
               foreignField: "_id",
               as: "owner",
-              pipeline:[
+              pipeline: [
                 {
-                  $project:{
+                  $project: {
                     username: 1,
                     fullname: 1,
-                    email:1,
+                    email: 1,
                     avatar: 1,
-                    coverImage: 1
-                  }
-                }
-              ]
-            }
+                    coverImage: 1,
+                  },
+                },
+              ],
+            },
           },
           {
-            $addFields:{
-              owner:{
-                $first:"$owner"
-              }
-            }
-          }
-        ]
-      }
-    }
-  ])
+            $addFields: {
+              owner: {
+                $first: "$owner",
+              },
+            },
+          },
+        ],
+      },
+    },
+  ]);
 
-  return res.status(200)
-  .json(
-    new ApiResponse(200,user[0].watchHistory,"Watch History fetched Successfully")
-  )
-
-})
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        user[0].watchHistory,
+        "Watch History fetched Successfully"
+      )
+    );
+});
 
 export {
   registerUser,
   loginUser,
   logoutUser,
   refreshAccessToken,
+  forgotPassword,
   changeCurrentPassword,
   getCurrentUser,
   updateAccountDetails,

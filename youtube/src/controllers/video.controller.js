@@ -9,8 +9,13 @@ import {
 } from "../utils/cloudinary.js";
 
 const getAllVideos = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, query, sortBy, sortType } = req.query;
-  //TODO: get all videos based on query, sort, pagination
+  const {
+    page = 1,
+    limit = 10,
+    query = "",
+    sortBy = "createdAt",
+    sortType = "desc",
+  } = req.query;
 
   const videos = await Video.aggregate([
     {
@@ -51,7 +56,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
       },
     },
     {
-      $skip: (page - 1) * limit,
+      $skip: (parseInt(page) - 1) * parseInt(limit),
     },
     {
       $limit: parseInt(limit),
@@ -70,9 +75,9 @@ const publishAVideo = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Please fill the Title and Description");
   }
 
-  const userID = req.user?._id
-  if(!userID){
-    throw new ApiError(401, "Unauthorized User")
+  const userID = req.user?._id;
+  if (!userID) {
+    throw new ApiError(401, "Unauthorized User");
   }
 
   const videoLocalPath = req?.files?.videoFile[0]?.path;
@@ -99,8 +104,8 @@ const publishAVideo = asyncHandler(async (req, res) => {
   });
 
   return res
-  .status(200)
-  .json(new ApiResponse(200, { savedVideo }, "Video uploaded"));
+    .status(200)
+    .json(new ApiResponse(200, { savedVideo }, "Video uploaded"));
 });
 
 const getVideoById = asyncHandler(async (req, res) => {
@@ -116,7 +121,9 @@ const getVideoById = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Video File is not found");
   }
 
-  return res.status(200).json(new ApiResponse(200, { video }, "Video fetched Successfully"));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { video }, "Video fetched Successfully"));
 });
 
 const updateVideo = asyncHandler(async (req, res) => {
@@ -136,11 +143,11 @@ const updateVideo = asyncHandler(async (req, res) => {
     throw new ApiError(404, "You Cannot Update the Video");
   }
 
-  const oldVideoFile = oldVideo?.videoFile
-  const oldThumbnail = oldVideo?.thumbnail;  
+  const oldVideoFile = oldVideo?.videoFile;
+  const oldThumbnail = oldVideo?.thumbnail;
 
-  const newVideo = req.files?.videoFile?.[0]?.path;  
-  const newThumbnail = req.files?.thumbnail?.[0]?.path;  
+  const newVideo = req.files?.videoFile?.[0]?.path;
+  const newThumbnail = req.files?.thumbnail?.[0]?.path;
 
   if (!newVideo || !newThumbnail) {
     throw new ApiError(404, "Please upload new Video and Thumbnail");
@@ -182,7 +189,13 @@ const updateVideo = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, { updatedVideo }, "Video details Updated successfully"));
+    .json(
+      new ApiResponse(
+        200,
+        { updatedVideo },
+        "Video details Updated successfully"
+      )
+    );
 });
 
 const deleteVideo = asyncHandler(async (req, res) => {
@@ -197,7 +210,7 @@ const deleteVideo = asyncHandler(async (req, res) => {
     throw new ApiError(404, "You Cannot Delete the Video");
   }
 
-  const oldVideoFile = oldVideo?.videoFile
+  const oldVideoFile = oldVideo?.videoFile;
   const oldThumbnail = oldVideo?.thumbnail;
 
   const deletedVideo = await Video.findByIdAndDelete(videoId);
@@ -215,7 +228,9 @@ const deleteVideo = asyncHandler(async (req, res) => {
     );
   }
 
-  return res.status(200).json(new ApiResponse(200, {}, "Video Deleted Successfully"));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Video Deleted Successfully"));
 });
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
@@ -242,9 +257,14 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
   );
 
   return res
-  .status(200)
-  .json(new ApiResponse(200,{toggleStatus},"Video publish status is toggled successfully"))
-
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { toggleStatus },
+        "Video publish status is toggled successfully"
+      )
+    );
 });
 
 export {
