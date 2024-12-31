@@ -1,13 +1,14 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js";
+import { Video } from "../models/video.model.js";
 import {
   uploadOnCloudinary,
   deleteFromCloudinary,
 } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
-import mongoose from "mongoose";
+import mongoose, { isValidObjectId } from "mongoose";
 
 const generateAccessAndRefreshToken = async (userId) => {
   try {
@@ -47,27 +48,26 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 
   const avatarLocalPath = req.files?.avatar[0]?.path;
-  // const coverImageLocalPath = req.files?.coverImage?.[0]?.path;
-
-  let coverImageLocalPath;
-  if (
-    req.files &&
-    Array.isArray(req.files.coverImage) &&
-    req.files.coverImage.length > 0
-  ) {
-    coverImageLocalPath = req.files.coverImage[0].path;
-  }
-
   if (!avatarLocalPath) {
     throw new ApiError(400, "Avatar file is required");
   }
 
   //upload them to cloudinary, avatar
   const avatar = await uploadOnCloudinary(avatarLocalPath);
-  const coverImage = await uploadOnCloudinary(coverImageLocalPath);
 
   if (!avatar) {
     throw new ApiError(400, "Avatar file is not uploaded");
+  }
+
+  let coverImageLocalPath;
+  let coverImage;
+  if (
+    req.files &&
+    Array.isArray(req.files.coverImage) &&
+    req.files.coverImage.length > 0
+  ) {
+    coverImageLocalPath = req.files.coverImage[0].path;
+    coverImage = await uploadOnCloudinary(coverImageLocalPath);
   }
 
   //create user object - create entry in db
@@ -215,17 +215,17 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       secure: true,
     };
 
-    const { accessToken, newrefreshToken } =
+    const { accessToken, refreshToken } =
       await generateAccessAndRefreshToken(user._id);
 
     return res
       .status(200)
       .cookie("accessToken", accessToken, options)
-      .cookie("refreshToken", newrefreshToken, options)
+      .cookie("refreshToken", refreshToken, options)
       .json(
         new ApiResponse(
           200,
-          { accessToken, newrefreshToken },
+          { accessToken, refreshToken },
           "Access token refreshed successfully"
         )
       );
@@ -234,16 +234,14 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   }
 });
 
-const forgotPassword = asyncHandler(async(req,res) => {
-  const {email, username, newPassword} = req.body;
-  if (
-    [email, username, newPassword].some((field) => field?.trim() === "")
-  ) {
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email, username, newPassword } = req.body;
+  if ([email, username, newPassword].some((field) => field?.trim() === "")) {
     throw new ApiError(400, "All fields are required");
   }
 
-  const user = await User.findOne({email: email, username: username});
-  if(!user) {
+  const user = await User.findOne({ email: email, username: username });
+  if (!user) {
     throw new ApiError(404, "User not found");
   }
   user.password = newPassword;
@@ -252,7 +250,7 @@ const forgotPassword = asyncHandler(async(req,res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, {}, "Password Changed Successfully"));
-})
+});
 
 const changeCurrentPassword = asyncHandler(async (req, res) => {
   const { oldPassword, newPassword } = req.body;
@@ -289,6 +287,11 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
 
   if (!fullname || !email || !username) {
     throw new ApiError(400, "Fullname, Email, Username are required");
+  }
+
+  const alreadyExists = await User.findOne({ $or: [{ email }, { username }] });
+  if (alreadyExists) {
+    throw new ApiError(400, "Email or Username already exists");
   }
 
   const user = await User.findByIdAndUpdate(
@@ -392,9 +395,11 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     { new: true }
   ).select("-password -refreshToken");
 
-  const deleteOldThumbnail = await deleteOnCloudinary(oldCoverImageUrl);
-  if (deleteOldThumbnail.result !== "ok") {
-    throw new ApiError(404, "Failed to delete old cover image from cloudinary");
+  if (oldCoverImage != null) {
+    const deleteOldThumbnail = await deleteFromCloudinary(oldCoverImageUrl);
+    if (deleteOldThumbnail.result !== "ok") {
+      throw new ApiError(404, "Failed to delete old cover image from cloudinary");
+    }
   }
 
   // Send success response
@@ -404,15 +409,10 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
 });
 
 const getUserChannelProfile = asyncHandler(async (req, res) => {
-  const { username } = req.params;
-
-  if (!username?.trim()) {
-    throw new ApiError(400, "Username is missing");
-  }
 
   const channel = await User.aggregate([
     {
-      $match: { username: username?.toLowerCase() },
+      $match: { '_id':new mongoose.Types.ObjectId(req.user?._id) },
     },
 
     {
@@ -521,6 +521,10 @@ const getWatchHistory = asyncHandler(async (req, res) => {
     },
   ]);
 
+  if(!user || user.length === 0){
+    throw new ApiError(404, "No watch history available");
+  }
+
   return res
     .status(200)
     .json(
@@ -531,6 +535,42 @@ const getWatchHistory = asyncHandler(async (req, res) => {
       )
     );
 });
+
+const addToWatchHistory = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+
+  // Validate videoId
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(404, "Invalid Video ID");
+  }
+
+  // Check if the video exists in the database
+  const videoExists = await Video.findById(videoId);
+  if (!videoExists) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  // Find the user and update their watchHistory
+  const user = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $addToSet: { watchHistory: videoId }, // Add videoId only if not already present
+    },
+    { new: true } // Return the updated user document
+  ).populate('watchHistory');
+
+  if (!user) {
+    throw new ApiError(404, "Video is Already in Watch history");
+  }
+
+  // Send success response
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { watchHistory: user.watchHistory }, "Video added to Watch History"));
+});
+
+
+
 
 export {
   registerUser,
@@ -545,4 +585,5 @@ export {
   updateUserCoverImage,
   getUserChannelProfile,
   getWatchHistory,
+  addToWatchHistory
 };

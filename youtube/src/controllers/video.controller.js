@@ -68,6 +68,70 @@ const getAllVideos = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, { videos }, "Videos fetched successfully"));
 });
 
+const getMyVideos = asyncHandler(async (req, res) => {
+  const {
+    page = 1,
+    limit = 10,
+    query = "",
+    sortBy = "createdAt",
+    sortType = "desc",
+  } = req.query;
+
+  const userId = req.user?._id;
+
+  const myVideos = await Video.aggregate([
+    {
+      $match: {
+        owner: userId, // Filter videos by the logged-in user's ID
+        $or: [
+          { title: { $regex: query, $options: "i" } },
+          { description: { $regex: query, $options: "i" } },
+        ],
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "createdBy",
+      },
+    },
+    {
+      $unwind: "$createdBy",
+    },
+    {
+      $project: {
+        videoFile: 1,
+        thumbnail: 1,
+        title: 1,
+        description: 1,
+        createdBy: {
+          fullname: 1,
+          username: 1,
+          avatar: 1,
+        },
+      },
+    },
+    {
+      $sort: {
+        [sortBy]: sortType === "asc" ? 1 : -1,
+      },
+    },
+    {
+      $skip: (parseInt(page) - 1) * parseInt(limit),
+    },
+    {
+      $limit: parseInt(limit),
+    },
+  ]);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { myVideos }, "Your videos fetched successfully"));
+});
+
+
 const publishAVideo = asyncHandler(async (req, res) => {
   const { title, description } = req.body;
   // TODO: get video, upload to cloudinary, create video
@@ -269,6 +333,7 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
 
 export {
   getAllVideos,
+  getMyVideos,
   publishAVideo,
   getVideoById,
   updateVideo,

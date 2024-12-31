@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
     deleteVideo,
     getAllVideos,
+    getMyVideos,
     getVideoById,
     publishAVideo,
     togglePublishStatus,
@@ -30,6 +31,7 @@ router
         ]),
         publishAVideo
     );
+router.get('/my-video',getMyVideos);
 
 router
     .route("/:videoId")
