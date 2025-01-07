@@ -72,21 +72,20 @@ const getMyVideos = asyncHandler(async (req, res) => {
   const {
     page = 1,
     limit = 10,
-    query = "",
     sortBy = "createdAt",
     sortType = "desc",
   } = req.query;
 
   const userId = req.user?._id;
 
+  if(!userId){
+    throw new ApiError(400, "User not authenticated");
+  }
+
   const myVideos = await Video.aggregate([
     {
       $match: {
-        owner: userId, // Filter videos by the logged-in user's ID
-        $or: [
-          { title: { $regex: query, $options: "i" } },
-          { description: { $regex: query, $options: "i" } },
-        ],
+        owner: userId,
       },
     },
     {
@@ -125,6 +124,10 @@ const getMyVideos = asyncHandler(async (req, res) => {
       $limit: parseInt(limit),
     },
   ]);
+
+  if(!myVideos){
+    throw new ApiError(404, "No videos found");
+  }
 
   return res
     .status(200)
