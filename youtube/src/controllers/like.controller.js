@@ -138,7 +138,7 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
 
     return res
       .status(200)
-      .json(200, commentLiked, "Comment liked successfully");
+      .json(new ApiResponse(200, commentLiked, "Comment liked successfully"));
   } else {
     const unlikeComment = await Like.findByIdAndDelete(comment?._id);
     if (!unlikeComment) {
@@ -148,6 +148,73 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
     return res
       .status(200)
       .json(new ApiResponse(200, unlikeComment, "Unlike comment successfully"));
+  }
+});
+
+const getCommentLikeStatus = asyncHandler(async (req, res) => {
+  const { commentId } = req.params;
+  if (!isValidObjectId(commentId)) {
+    throw new ApiError(400, "Comment ID is not valid");
+  }
+
+  const userId = req.user?._id;
+  if (!userId) {
+    throw new ApiError(400, "User not authenticated");
+  }
+
+  try {
+    // Check if a like exists for the video and user
+    const like = await Like.findOne({
+      comment: commentId,
+      likedBy: userId,
+    });
+
+    // Respond with the like status
+    const isLiked = !!like; // Convert to boolean (true if liked, false otherwise)
+    return res
+      .status(200)
+      .json(new ApiResponse(200, { isLiked }, "Fetched like status successfully"));
+  } catch (error) {
+    throw new ApiError(500, error.message || "Something went wrong");
+  }
+});
+
+const commentLikeCount = asyncHandler(async (req, res) => {
+  const { commentId } = req.params;
+  
+  if (!isValidObjectId(commentId)) {
+    throw new ApiError(400, "Comment ID is not valid");
+  }
+
+  try {
+    // Count the number of likes for the video
+    const result = await Like.aggregate([
+      {
+        $match: {
+          comment: new mongoose.Types.ObjectId(commentId),
+        },
+      },
+      {
+        $count: "likeCount", // This will count the number of documents
+      },
+    ]);
+
+    if(!result){
+      throw new ApiError(500, "Failed to fetch like count for comments");
+    }
+
+    // If no likes are found
+    if (result.length === 0) {
+      return res
+       .status(200)
+       .json(new ApiResponse(200, { likeCount: 0 }, "No likes found for the Comments"));
+    }
+
+    // Return the like count as a simple number (not in an array)
+    const likeCount = result[0].likeCount;
+    return res.status(200).json(new ApiResponse(200, { likeCount }, "Fetched like count successfully"));
+  } catch (error) {
+    throw new ApiError(500, error.message || "Something went wrong");
   }
 });
 
@@ -282,4 +349,4 @@ const getLikedVideos = asyncHandler(async (req, res) => {
 });
 
 
-export { toggleCommentLike,getVideoLikeStatus,videoLikeCount, toggleTweetLike, toggleVideoLike, getLikedVideos };
+export { toggleCommentLike,getCommentLikeStatus,getVideoLikeStatus,videoLikeCount,commentLikeCount, toggleTweetLike, toggleVideoLike, getLikedVideos };

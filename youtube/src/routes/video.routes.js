@@ -5,6 +5,7 @@ import {
     getMyVideos,
     getVideoById,
     publishAVideo,
+    viewsCount,
     togglePublishStatus,
     updateVideo,
 } from "../controllers/video.controller.js"
@@ -32,6 +33,7 @@ router
         publishAVideo
     );
 router.get('/my-video',getMyVideos);
+router.get('/views/:videoId',viewsCount);
 
 router
     .route("/:videoId")

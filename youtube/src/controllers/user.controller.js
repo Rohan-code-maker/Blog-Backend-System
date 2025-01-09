@@ -215,8 +215,9 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       secure: true,
     };
 
-    const { accessToken, refreshToken } =
-      await generateAccessAndRefreshToken(user._id);
+    const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
+      user._id
+    );
 
     return res
       .status(200)
@@ -398,7 +399,10 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
   if (oldCoverImage != null) {
     const deleteOldThumbnail = await deleteFromCloudinary(oldCoverImageUrl);
     if (deleteOldThumbnail.result !== "ok") {
-      throw new ApiError(404, "Failed to delete old cover image from cloudinary");
+      throw new ApiError(
+        404,
+        "Failed to delete old cover image from cloudinary"
+      );
     }
   }
 
@@ -409,10 +413,9 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
 });
 
 const getUserChannelProfile = asyncHandler(async (req, res) => {
-
   const channel = await User.aggregate([
     {
-      $match: { '_id':new mongoose.Types.ObjectId(req.user?._id) },
+      $match: { _id: new mongoose.Types.ObjectId(req.user?._id) },
     },
 
     {
@@ -521,7 +524,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
     },
   ]);
 
-  if(!user || user.length === 0){
+  if (!user || user.length === 0) {
     throw new ApiError(404, "No watch history available");
   }
 
@@ -544,33 +547,53 @@ const addToWatchHistory = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Invalid Video ID");
   }
 
-  // Check if the video exists in the database
-  const videoExists = await Video.findById(videoId);
-  if (!videoExists) {
+  // Check if the video exists
+  const video = await Video.findById(videoId);
+  if (!video) {
     throw new ApiError(404, "Video not found");
   }
 
-  // Find the user and update their watchHistory
-  const user = await User.findByIdAndUpdate(
-    req.user?._id,
-    {
-      $addToSet: { watchHistory: videoId }, // Add videoId only if not already present
-    },
-    { new: true } // Return the updated user document
-  ).populate('watchHistory');
-
+  // Check if the video is already in the user's watch history
+  const user = await User.findById(req.user?._id);
   if (!user) {
-    throw new ApiError(404, "Video is Already in Watch history");
+    throw new ApiError(404, "User not found");
   }
 
+  const alreadyWatched = user.watchHistory.includes(videoId);
+
+  if (!alreadyWatched) {
+    // Increment video views if not already watched
+    video.views += 1;
+    await video.save();
+
+    // Add the video to the user's watch history
+    user.watchHistory.push(videoId);
+    await user.save();
+  }
+
+  // Populate the updated watch history
+  const updatedUser = await User.findById(req.user?._id).populate("watchHistory");
+
   // Send success response
-  return res
-    .status(200)
-    .json(new ApiResponse(200, { watchHistory: user.watchHistory }, "Video added to Watch History"));
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      { watchHistory: updatedUser.watchHistory },
+      alreadyWatched
+        ? "Video already in Watch History"
+        : "Video added to Watch History"
+    )
+  );
 });
 
+const getViewsCount = asyncHandler(async (req, res) => {
+  const {videoId} = req.params;
+  if(!isValidObjectId(videoId)){
+    throw new ApiError(404, "Invalid Video ID");
+  }
 
-
+  const views = await Video.findById(videoId);
+})
 
 export {
   registerUser,
@@ -585,5 +608,5 @@ export {
   updateUserCoverImage,
   getUserChannelProfile,
   getWatchHistory,
-  addToWatchHistory
+  addToWatchHistory,
 };

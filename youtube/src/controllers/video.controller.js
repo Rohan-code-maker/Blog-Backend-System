@@ -1,4 +1,5 @@
 import mongoose, { isValidObjectId } from "mongoose";
+import { User } from "../models/user.model.js";
 import { Video } from "../models/video.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -78,7 +79,7 @@ const getMyVideos = asyncHandler(async (req, res) => {
 
   const userId = req.user?._id;
 
-  if(!userId){
+  if (!userId) {
     throw new ApiError(400, "User not authenticated");
   }
 
@@ -125,15 +126,16 @@ const getMyVideos = asyncHandler(async (req, res) => {
     },
   ]);
 
-  if(!myVideos){
+  if (!myVideos) {
     throw new ApiError(404, "No videos found");
   }
 
   return res
     .status(200)
-    .json(new ApiResponse(200, { myVideos }, "Your videos fetched successfully"));
+    .json(
+      new ApiResponse(200, { myVideos }, "Your videos fetched successfully")
+    );
 });
-
 
 const publishAVideo = asyncHandler(async (req, res) => {
   const { title, description } = req.body;
@@ -295,6 +297,17 @@ const deleteVideo = asyncHandler(async (req, res) => {
     );
   }
 
+  const user = await User.findByIdAndDelete(
+    req.user?._id,
+    {
+      $pull: { watchHistory: videoId },
+    },
+    { new: true } // Return the updated user document
+  );
+  if (!user) {
+    throw new ApiError(404, "VideoId not deleted from watch history");
+  }
+
   return res
     .status(200)
     .json(new ApiResponse(200, {}, "Video Deleted Successfully"));
@@ -334,6 +347,30 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
     );
 });
 
+const viewsCount = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, "Video id is not valid");
+  }
+
+  const video = await Video.findById(videoId);
+  if (!video) {
+    throw new ApiError(404, "Video File is not found");
+  }
+  const views = video.views;
+  if (views == 0) {
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(200, { views: 0 }, "No Views found for this video")
+      );
+  } else {
+    return res
+      .status(200)
+      .json(new ApiResponse(200, { views }, "Views fetched successfully"));
+  }
+});
+
 export {
   getAllVideos,
   getMyVideos,
@@ -341,5 +378,6 @@ export {
   getVideoById,
   updateVideo,
   deleteVideo,
+  viewsCount,
   togglePublishStatus,
 };
