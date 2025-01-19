@@ -59,12 +59,12 @@ const getSubscribeStatus = asyncHandler(async (req, res) => {
   if (!isValidObjectId(channelId)) {
     throw new ApiError(400, "Invalid channel ID");
   }
-  const userId = req.user._id;
+  const userId = req.user?._id;
   if (!isValidObjectId(userId)) {
     throw new ApiError(400, "User not authenticated");
   }
   try {
-    const subscribe = Subscription.findOne({
+    const subscribe = await  Subscription.findOne({
       $and: [{ channel: channelId }, { subscriber: userId }],
     });
     const isSubscribed = !!subscribe;
