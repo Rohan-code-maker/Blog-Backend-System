@@ -479,6 +479,78 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
     );
 });
 
+const getUserById = asyncHandler(async (req, res) => {
+  const {userId} = req.params;
+
+  if(!isValidObjectId(userId)){
+    throw new ApiError(400, "Invalid user ID");
+  }
+  const channel = await User.aggregate([
+    {
+      $match: { _id: new mongoose.Types.ObjectId(userId) },
+    },
+
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers",
+      },
+    },
+
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "subscriber",
+        as: "subscribedTo",
+      },
+    },
+
+    {
+      $addFields: {
+        subscribersCount: {
+          $size: "$subscribers",
+        },
+        channelsSubscribedToCount: {
+          $size: "$subscribedTo",
+        },
+        isSubscribed: {
+          $cond: {
+            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+            then: true,
+            else: false,
+          },
+        },
+      },
+    },
+
+    {
+      $project: {
+        username: 1,
+        fullname: 1,
+        email: 1,
+        avatar: 1,
+        coverImage: 1,
+        subscribersCount: 1,
+        channelsSubscribedToCount: 1,
+        isSubscribed: 1,
+      },
+    },
+  ]);
+
+  if (!channel?.length) {
+    throw new ApiError(404, "User not found");
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, channel[0], "User channel fetched successfully")
+    );
+});
+
 const getWatchHistory = asyncHandler(async (req, res) => {
   const user = await User.aggregate([
     {
@@ -586,15 +658,6 @@ const addToWatchHistory = asyncHandler(async (req, res) => {
   );
 });
 
-const getViewsCount = asyncHandler(async (req, res) => {
-  const {videoId} = req.params;
-  if(!isValidObjectId(videoId)){
-    throw new ApiError(404, "Invalid Video ID");
-  }
-
-  const views = await Video.findById(videoId);
-})
-
 export {
   registerUser,
   loginUser,
@@ -609,4 +672,5 @@ export {
   getUserChannelProfile,
   getWatchHistory,
   addToWatchHistory,
+  getUserById,
 };

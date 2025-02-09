@@ -137,6 +137,74 @@ const getMyVideos = asyncHandler(async (req, res) => {
     );
 });
 
+const getUserVideos = asyncHandler(async (req, res) => {
+  const {
+    page = 1,
+    limit = 10,
+    sortBy = "createdAt",
+    sortType = "desc",
+  } = req.query;
+
+  const { userId } = req.params;
+
+  if (!isValidObjectId(userId)) {
+    throw new ApiError(400, "User ID is not valid");
+  }
+
+  const userVideos = await Video.aggregate([
+    {
+      $match: {
+        owner: new mongoose.Types.ObjectId(userId),
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "createdBy",
+      },
+    },
+    {
+      $unwind: "$createdBy",
+    },
+    {
+      $project: {
+        videoFile: 1,
+        thumbnail: 1,
+        title: 1,
+        description: 1,
+        createdBy: {
+          fullname: 1,
+          username: 1,
+          avatar: 1,
+        },
+      },
+    },
+    {
+      $sort: {
+        [sortBy]: sortType === "asc" ? 1 : -1,
+      },
+    },
+    {
+      $skip: (parseInt(page) - 1) * parseInt(limit),
+    },
+    {
+      $limit: parseInt(limit),
+    },
+  ]);
+
+  if (!userVideos.length) {
+    throw new ApiError(404, "No videos found for this user");
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, { userVideos }, "User's videos fetched successfully")
+    );
+});
+
 const publishAVideo = asyncHandler(async (req, res) => {
   const { title, description } = req.body;
   // TODO: get video, upload to cloudinary, create video
@@ -184,7 +252,10 @@ const getVideoById = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Video id is not valid");
   }
 
-  const video = await Video.findById(videoId);
+  const video = await Video.findById(videoId).populate({
+    path: "owner",
+    select: "username avatar", // Selecting only name and avatar
+  });
 
   if (!video) {
     throw new ApiError(404, "Video File is not found");
@@ -380,4 +451,5 @@ export {
   deleteVideo,
   viewsCount,
   togglePublishStatus,
+  getUserVideos
 };
