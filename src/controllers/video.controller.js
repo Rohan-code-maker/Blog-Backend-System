@@ -14,10 +14,8 @@ const getAllVideos = asyncHandler(async (req, res) => {
     page = 1,
     limit = 10,
     query = "",
-    sortBy = "createdAt",
-    sortType = "desc",
   } = req.query;
-
+    
   const videos = await Video.aggregate([
     {
       $match: {
@@ -53,7 +51,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
     },
     {
       $sort: {
-        [sortBy]: sortType === "asc" ? 1 : -1,
+        createdAt: -1,
       },
     },
     {
@@ -62,7 +60,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
     {
       $limit: parseInt(limit),
     },
-  ]);
+  ]);  
 
   return res
     .status(200)
@@ -115,7 +113,7 @@ const getMyVideos = asyncHandler(async (req, res) => {
     },
     {
       $sort: {
-        [sortBy]: sortType === "asc" ? 1 : -1,
+        [sortBy]: -1,
       },
     },
     {
@@ -183,7 +181,7 @@ const getUserVideos = asyncHandler(async (req, res) => {
     },
     {
       $sort: {
-        [sortBy]: sortType === "asc" ? 1 : -1,
+        [sortBy]: -1,
       },
     },
     {
@@ -368,7 +366,7 @@ const deleteVideo = asyncHandler(async (req, res) => {
     );
   }
 
-  const user = await User.findByIdAndDelete(
+  const user = await User.findByIdAndUpdate(
     req.user?._id,
     {
       $pull: { watchHistory: videoId },
@@ -451,5 +449,5 @@ export {
   deleteVideo,
   viewsCount,
   togglePublishStatus,
-  getUserVideos
+  getUserVideos,
 };
