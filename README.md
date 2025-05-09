@@ -1,17 +1,5 @@
 # BLOG APPLICATION API
 
-**COMPANY** : CODTECH IT SOLUTIONS
-
-**NAME** : ROHAN KUMAR GUPTA
-
-**INTERN ID** : CT4MKNM
-
-**DOMAIN** : BACKEND WEB DEVELOPMENT
-
-**DURATION** : 4 WEEKS
-
-**MENTOR** : NEELA SANTOSH
-
 ## DESCRIPTION OF TASK
 
 The Blog Application API is a backend service designed to facilitate the creation, management, and storage of blog posts. This system enables users to publish articles with images or videos securely while ensuring data persistence using **MongoDB**. Additionally, the API integrates **Cloudinary** for media storage, allowing users to upload and manage images and videos seamlessly.
